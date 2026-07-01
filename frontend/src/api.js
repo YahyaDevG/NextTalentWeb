@@ -1,4 +1,5 @@
 const BASE = process.env.REACT_APP_API_URL || '';
+const ADMIN_SECRET = process.env.REACT_APP_ADMIN_SECRET || 'nexttalent-admin-2025';
 
 async function request(method, path, body, isForm = false) {
   const opts = {
@@ -14,8 +15,8 @@ async function request(method, path, body, isForm = false) {
 
 export const api = {
   // Auth
-  register: (payload)        => request('POST', '/auth/register', payload),
-  login:    (payload)        => request('POST', '/auth/login',    payload),
+  register: (payload)      => request('POST', '/auth/register', payload),
+  login:    (payload)      => request('POST', '/auth/login',    payload),
 
   // CV
   extractCV: (file) => {
@@ -25,17 +26,45 @@ export const api = {
   },
 
   // Candidats
-  getCandidats: ()   => request('GET',    '/candidats/'),
+  getCandidats:   ()   => request('GET',    '/candidats/'),
   deleteCandidat: (id) => request('DELETE', `/candidats/${id}`),
 
   // Offres
-  getOffres:    ()      => request('GET',    '/offres/'),
-  createOffre:  (data)  => request('POST',   '/offres/', data),
-  deleteOffre:  (id)    => request('DELETE', `/offres/${id}`),
+  getOffres:   ()     => request('GET',    '/offres/'),
+  createOffre: (data) => request('POST',   '/offres/', data),
+  deleteOffre: (id)   => request('DELETE', `/offres/${id}`),
 
   // Ranking
   getRanking: (offreId) => request('GET', `/offres/${offreId}/ranking/`),
 
   // Chat RAG
   chat: (question) => request('POST', '/chat-rag/', { question }),
+
+  // ── Admin ────────────────────────────────────────────────────────────────
+  adminLogin: (email, password, secret) =>
+    request('POST', '/admin/login', { email, password, secret }),
+
+  adminStats: () =>
+    request('GET', `/admin/stats?secret=${ADMIN_SECRET}`),
+
+  adminGetUsers: () =>
+    request('GET', `/admin/users?secret=${ADMIN_SECRET}`),
+
+  adminBlockUser: (id, is_blocked) =>
+    request('PATCH', `/admin/users/${id}?secret=${ADMIN_SECRET}`, { is_blocked }),
+
+  adminDeleteUser: (id) =>
+    request('DELETE', `/admin/users/${id}?secret=${ADMIN_SECRET}`),
+
+  adminGetOffres: () =>
+    request('GET', `/admin/offres?secret=${ADMIN_SECRET}`),
+
+  adminDeleteOffre: (id) =>
+    request('DELETE', `/admin/offres/${id}?secret=${ADMIN_SECRET}`),
+
+  adminGetCandidats: () =>
+    request('GET', `/admin/candidats?secret=${ADMIN_SECRET}`),
+
+  adminCreateAdmin: (nom, email, password) =>
+    request('POST', `/admin/create-admin?secret=${ADMIN_SECRET}`, { nom, email, password, role: 'admin' }),
 };
