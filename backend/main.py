@@ -335,3 +335,115 @@ Question du recruteur : {query.question}"""
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "2.0.0"}
+
+
+# ─── ADMIN ───────────────────────────────────────────────────────────────────
+
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "nexttalent-admin-2025")
+
+class AdminLogin(BaseModel):
+    email: str
+    password: str
+    secret: str
+
+class AdminUserUpdate(BaseModel):
+    is_blocked: Optional[bool] = None
+
+@app.post("/admin/login")
+def admin_login(creds: AdminLogin, db: Session = Depends(get_db)):
+    if creds.secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Cle secrete incorrecte")
+    user = db.query(UserModel).filter(UserModel.email == creds.email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Email non enregistre")
+    if not bcrypt.checkpw(creds.password.encode(), user.password_hash.encode()):
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Acces refuse - role admin requis")
+    return {"user_id": user.id, "nom": user.nom, "email": user.email, "role": user.role}
+
+@app.get("/admin/stats")
+def admin_stats(secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    return {
+        "total_users":      db.query(UserModel).count(),
+        "total_recruteurs": db.query(UserModel).filter(UserModel.role == "recruteur").count(),
+        "total_candidats":  db.query(UserModel).filter(UserModel.role == "candidat").count(),
+        "total_blocked":    db.query(UserModel).filter(UserModel.is_blocked == True).count(),
+        "total_cv":         db.query(CandidatModel).count(),
+        "total_offres":     db.query(OffreModel).count(),
+    }
+
+@app.get("/admin/users")
+def admin_get_users(secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    users = db.query(UserModel).all()
+    return [{"id": u.id, "nom": u.nom, "email": u.email, "role": u.role, "is_blocked": u.is_blocked, "created_at": u.created_at.isoformat() if u.created_at else None} for u in users]
+
+@app.patch("/admin/users/{user_id}")
+def admin_update_user(user_id: int, data: AdminUserUpdate, secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    if user.role == "admin":
+        raise HTTPException(status_code=403, detail="Impossible de modifier un admin")
+    if data.is_blocked is not None:
+        user.is_blocked = data.is_blocked
+    db.commit()
+    return {"message": "Utilisateur mis a jour", "is_blocked": user.is_blocked}
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(user_id: int, secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    if user.role == "admin":
+        raise HTTPException(status_code=403, detail="Impossible de supprimer un admin")
+    db.delete(user)
+    db.commit()
+    return {"message": "Utilisateur supprime"}
+
+@app.get("/admin/offres")
+def admin_get_offres(secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    offres = db.query(OffreModel).all()
+    return [{"id": o.id, "titre": o.titre, "description": o.description, "hard_skills_requis": o.hard_skills_requis, "annees_experience_requises": o.annees_experience_requises, "created_at": o.created_at.isoformat() if o.created_at else None} for o in offres]
+
+@app.delete("/admin/offres/{offre_id}")
+def admin_delete_offre(offre_id: int, secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    o = db.query(OffreModel).filter(OffreModel.id == offre_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Offre introuvable")
+    db.delete(o)
+    db.commit()
+    return {"message": "Offre supprimee"}
+
+@app.get("/admin/candidats")
+def admin_get_candidats(secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Acces refuse")
+    candidats = db.query(CandidatModel).all()
+    return [{"id": c.id, "nom_complet": c.nom_complet, "email": c.email, "dernier_poste": c.dernier_poste, "annees_experience": c.annees_experience, "hard_skills": c.hard_skills, "created_at": c.created_at.isoformat() if c.created_at else None} for c in candidats]
+
+@app.post("/admin/create-admin")
+def create_admin_account(user: UserCreate, secret: str, db: Session = Depends(get_db)):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Cle secrete incorrecte")
+    existing = db.query(UserModel).filter(UserModel.email == user.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja utilise")
+    hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
+    new_admin = UserModel(nom=user.nom, email=user.email, password_hash=hashed, role="admin")
+    db.add(new_admin)
+    db.commit()
+    db.refresh(new_admin)
+    return {"message": "Compte admin cree", "user_id": new_admin.id}
