@@ -8,10 +8,15 @@ from datetime import datetime
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./nexttalent.db")
+
+# Corriger l'URL pour psycopg3
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -23,7 +28,7 @@ class UserModel(Base):
     nom           = Column(String(200), nullable=False)
     email         = Column(String(200), unique=True, index=True, nullable=False)
     password_hash = Column(String(200), nullable=False)
-    role          = Column(String(50), nullable=False)  # "recruteur" | "candidat" | "admin"
+    role          = Column(String(50), nullable=False)
     is_blocked    = Column(Boolean, default=False)
     created_at    = Column(DateTime, default=datetime.utcnow)
 
