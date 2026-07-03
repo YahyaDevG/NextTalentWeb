@@ -42,7 +42,7 @@ export const api = {
 
   // ── Admin ────────────────────────────────────────────────────────────────
   adminLogin: (email, password, secret) =>
-    request('POST', '/admin/login', { email, password, secret }),
+    request('POST', `/admin/login?secret=${secret}`, { email, password, secret }),
 
   adminStats: () =>
     request('GET', `/admin/stats?secret=${ADMIN_SECRET}`),
