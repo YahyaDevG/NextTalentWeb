@@ -1,8 +1,10 @@
 import os
+import secrets
 import json
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import pdfplumber
 from groq import Groq
@@ -11,6 +13,7 @@ from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer, util
 
 from database import engine, Base, CandidatModel, OffreModel, UserModel, get_db
+from email_service import send_verification_email, send_welcome_email
 import bcrypt
 
 load_dotenv()
@@ -78,11 +81,64 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email déjà utilisé")
     hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
-    new_user = UserModel(nom=user.nom, email=user.email, password_hash=hashed, role=user.role)
+    token = secrets.token_urlsafe(32)
+    new_user = UserModel(
+        nom=user.nom, email=user.email, password_hash=hashed,
+        role=user.role, is_verified=False, verification_token=token
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"message": "Compte créé", "user_id": new_user.id, "nom": new_user.nom, "role": new_user.role}
+    # Envoi email de vérification
+    send_verification_email(user.email, user.nom, token)
+    return {"message": "Compte créé. Vérifiez votre email pour activer votre compte.", "user_id": new_user.id}
+
+@app.get("/auth/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    user = db.query(UserModel).filter(UserModel.verification_token == token).first()
+    if not user:
+        return HTMLResponse(content="""
+        <html><body style="font-family:Arial;text-align:center;padding:60px;background:#FEF2F2">
+        <h1 style="color:#EF4444">❌ Lien invalide</h1>
+        <p>Ce lien de vérification est invalide ou a déjà été utilisé.</p>
+        <a href="https://nexttalent.ma" style="color:#4F46E5">Retour à NextTalent</a>
+        </body></html>
+        """, status_code=400)
+    if user.is_verified:
+        return HTMLResponse(content="""
+        <html><body style="font-family:Arial;text-align:center;padding:60px;background:#F0FDF4">
+        <h1 style="color:#10B981">✅ Email déjà vérifié</h1>
+        <p>Votre compte est déjà activé.</p>
+        <a href="https://nexttalent.ma" style="background:#4F46E5;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:16px">Se connecter</a>
+        </body></html>
+        """)
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    send_welcome_email(user.email, user.nom)
+    return HTMLResponse(content=f"""
+    <html><body style="font-family:Arial;text-align:center;padding:60px;background:linear-gradient(135deg,#EEF2FF,#F5F3FF)">
+    <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 8px 32px rgba(79,70,229,.15)">
+    <div style="font-size:56px;margin-bottom:16px">🎉</div>
+    <h1 style="color:#4F46E5;font-size:24px">Email confirmé !</h1>
+    <p style="color:#6B7280;margin:16px 0">Bonjour <strong>{user.nom}</strong>, votre compte NextTalent est maintenant actif.</p>
+    <a href="https://nexttalent.ma" style="background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:700;margin-top:8px">🚀 Accéder à NextTalent</a>
+    </div>
+    </body></html>
+    """)
+
+@app.post("/auth/resend-verification")
+def resend_verification(email: str, db: Session = Depends(get_db)):
+    user = db.query(UserModel).filter(UserModel.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email non trouvé")
+    if user.is_verified:
+        raise HTTPException(status_code=400, detail="Email déjà vérifié")
+    token = secrets.token_urlsafe(32)
+    user.verification_token = token
+    db.commit()
+    send_verification_email(user.email, user.nom, token)
+    return {"message": "Email de vérification renvoyé"}
 
 @app.post("/auth/login")
 def login(creds: UserLogin, db: Session = Depends(get_db)):
@@ -93,6 +149,10 @@ def login(creds: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
     if user.role != creds.role:
         raise HTTPException(status_code=401, detail="Rôle non correspondant")
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="EMAIL_NOT_VERIFIED")
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="Compte bloqué. Contactez l'administrateur.")
     return {"user_id": user.id, "nom": user.nom, "email": user.email, "role": user.role}
 
 
