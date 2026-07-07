@@ -1,23 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Btn, Input, Select, Alert, Spinner } from '../components/ui';
+import { Btn, Input, Select, Alert } from '../components/ui';
 
 export default function AuthPage({ onLogin }) {
-  const [tab, setTab]       = useState('login');
+  const [tab,     setTab]     = useState('login');
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
+  const [error,   setError]   = useState('');
   const [success, setSuccess] = useState('');
+  const [showResend, setShowResend] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
 
-  // Login state
-  const [lEmail, setLEmail] = useState('recruteur@test.com');
-  const [lPass,  setLPass]  = useState('123');
+  // Login
+  const [lEmail, setLEmail] = useState('');
+  const [lPass,  setLPass]  = useState('');
   const [lRole,  setLRole]  = useState('recruteur');
 
-  // Register state
+  // Register
   const [rNom,   setRNom]   = useState('');
   const [rEmail, setREmail] = useState('');
   const [rPass,  setRPass]  = useState('');
   const [rRole,  setRRole]  = useState('recruteur');
+
+  // Handle /verify-email?token= in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token && window.location.pathname === '/verify-email') {
+      // Redirect to backend verify endpoint
+      window.location.href = `${process.env.REACT_APP_API_URL || ''}/auth/verify-email?token=${token}`;
+    }
+  }, []);
 
   const roleOptions = [
     { value: 'recruteur', label: '🏢 Recruteur (RH)' },
@@ -26,15 +38,19 @@ export default function AuthPage({ onLogin }) {
 
   async function handleLogin(e) {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError(''); setLoading(true); setShowResend(false);
     try {
       const user = await api.login({ email: lEmail, password: lPass, role: lRole });
       onLogin(user);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      if (err.message === 'EMAIL_NOT_VERIFIED') {
+        setError('Votre email n\'est pas encore vérifié. Vérifiez votre boîte mail ou renvoyez le lien.');
+        setResendEmail(lEmail);
+        setShowResend(true);
+      } else {
+        setError(err.message);
+      }
+    } finally { setLoading(false); }
   }
 
   async function handleRegister(e) {
@@ -42,18 +58,29 @@ export default function AuthPage({ onLogin }) {
     setError(''); setLoading(true);
     try {
       await api.register({ nom: rNom, email: rEmail, password: rPass, role: rRole });
-      setSuccess('Compte créé ! Vous pouvez vous connecter.');
-      setTimeout(() => { setTab('login'); setLEmail(rEmail); setLPass(rPass); setLRole(rRole); setSuccess(''); }, 1500);
+      setSuccess('');
+      setTab('check-email');
+      setResendEmail(rEmail);
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
+  }
+
+  async function handleResend() {
+    setLoading(true);
+    try {
+      await api.resendVerification(resendEmail);
+      setSuccess('Email renvoyé ! Vérifiez votre boîte mail.');
+      setShowResend(false);
+    } catch (err) {
+      setError(err.message);
+    } finally { setLoading(false); }
   }
 
   const tabStyle = (active) => ({
     flex: 1, padding: '11px 0', textAlign: 'center', border: 'none',
-    background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: active ? 600 : 400,
+    background: 'transparent', cursor: 'pointer', fontSize: 14,
+    fontWeight: active ? 600 : 400,
     color: active ? 'var(--indigo)' : 'var(--text-2)',
     borderBottom: active ? '2px solid var(--indigo)' : '2px solid transparent',
     transition: 'all .15s', marginBottom: -1,
@@ -64,8 +91,7 @@ export default function AuthPage({ onLogin }) {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'linear-gradient(140deg, #EEF2FF 0%, #F5F3FF 50%, #F0FDF4 100%)',
     }}>
-      {/* Background decoration */}
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,.08) 0%, transparent 70%)', top: '-10%', left: '-5%' }} />
         <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,.07) 0%, transparent 70%)', bottom: '-5%', right: '-5%' }} />
       </div>
@@ -85,50 +111,77 @@ export default function AuthPage({ onLogin }) {
           <p style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Plateforme intelligente de recrutement IA</p>
         </div>
 
-        {/* Card */}
-        <div style={{
-          background: 'var(--surface)', borderRadius: 'var(--radius-xl)',
-          boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)',
-          overflow: 'hidden',
-        }}>
-          {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-            <button style={tabStyle(tab === 'login')}    onClick={() => { setTab('login');    setError(''); }}>Se connecter</button>
-            <button style={tabStyle(tab === 'register')} onClick={() => { setTab('register'); setError(''); }}>S'inscrire</button>
-          </div>
-
-          <div style={{ padding: '24px 28px' }}>
-            {error   && <div style={{ marginBottom: 14 }}><Alert type="danger">{error}</Alert></div>}
+        {/* ── Vérification email envoyée ── */}
+        {tab === 'check-email' ? (
+          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', padding: '36px 28px', textAlign: 'center' }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>📧</div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Vérifiez votre email !</h2>
+            <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 20 }}>
+              Un email de confirmation a été envoyé à <strong>{resendEmail}</strong>.<br />
+              Cliquez sur le lien dans l'email pour activer votre compte.
+            </p>
+            <div style={{ background: 'var(--indigo-50)', borderRadius: 'var(--radius)', padding: '12px 16px', fontSize: 13, color: 'var(--indigo-dark)', marginBottom: 20 }}>
+              💡 Vérifiez aussi votre dossier <strong>Spam</strong> si vous ne trouvez pas l'email.
+            </div>
             {success && <div style={{ marginBottom: 14 }}><Alert type="success">{success}</Alert></div>}
-
-            {tab === 'login' ? (
-              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <Input label="Adresse e-mail"  value={lEmail} onChange={setLEmail} type="email"    placeholder="vous@exemple.com" required />
-                <Input label="Mot de passe"    value={lPass}  onChange={setLPass}  type="password" placeholder="••••••••"         required />
-                <Select label="Votre rôle" value={lRole} onChange={setLRole} options={roleOptions} />
-                <Btn type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
-                  <i className="ti ti-login" /> Se connecter
-                </Btn>
-                <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-                  Démo : recruteur@test.com / 123 · candidat@test.com / 123
-                </p>
-              </form>
-            ) : (
-              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <Input label="Nom complet"     value={rNom}   onChange={setRNom}   placeholder="Prénom Nom" required />
-                <Input label="Adresse e-mail"  value={rEmail} onChange={setREmail} type="email"    placeholder="vous@exemple.com" required />
-                <Input label="Mot de passe"    value={rPass}  onChange={setRPass}  type="password" placeholder="••••••••" required />
-                <Select label="Votre rôle" value={rRole} onChange={setRRole} options={roleOptions} />
-                <Btn type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
-                  <i className="ti ti-user-plus" /> Créer mon compte
-                </Btn>
-              </form>
-            )}
+            {error   && <div style={{ marginBottom: 14 }}><Alert type="danger">{error}</Alert></div>}
+            <Btn variant="secondary" onClick={handleResend} loading={loading} style={{ width: '100%', marginBottom: 12 }}>
+              <i className="ti ti-mail" /> Renvoyer l'email
+            </Btn>
+            <button onClick={() => { setTab('login'); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13 }}>
+              ← Retour à la connexion
+            </button>
           </div>
-        </div>
+        ) : (
+          /* ── Login / Register ── */
+          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+              <button style={tabStyle(tab === 'login')}    onClick={() => { setTab('login');    setError(''); setSuccess(''); setShowResend(false); }}>Se connecter</button>
+              <button style={tabStyle(tab === 'register')} onClick={() => { setTab('register'); setError(''); setSuccess(''); setShowResend(false); }}>S'inscrire</button>
+            </div>
+
+            <div style={{ padding: '24px 28px' }}>
+              {error   && <div style={{ marginBottom: 14 }}><Alert type="danger">{error}</Alert></div>}
+              {success && <div style={{ marginBottom: 14 }}><Alert type="success">{success}</Alert></div>}
+
+              {tab === 'login' ? (
+                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <Input label="Adresse e-mail" value={lEmail} onChange={setLEmail} type="email" placeholder="vous@exemple.com" required />
+                  <Input label="Mot de passe"   value={lPass}  onChange={setLPass}  type="password" placeholder="••••••••" required />
+                  <Select label="Votre rôle" value={lRole} onChange={setLRole} options={roleOptions} />
+                  <Btn type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
+                    <i className="ti ti-login" /> Se connecter
+                  </Btn>
+                  {showResend && (
+                    <button type="button" onClick={handleResend} style={{
+                      background: 'var(--indigo-50)', border: '1px solid var(--indigo)',
+                      color: 'var(--indigo)', borderRadius: 'var(--radius)', padding: '9px',
+                      cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    }}>
+                      <i className="ti ti-mail" /> Renvoyer l'email de confirmation
+                    </button>
+                  )}
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <Input label="Nom complet"    value={rNom}   onChange={setRNom}   placeholder="Prénom Nom" required />
+                  <Input label="Adresse e-mail" value={rEmail} onChange={setREmail} type="email" placeholder="vous@exemple.com" required />
+                  <Input label="Mot de passe"   value={rPass}  onChange={setRPass}  type="password" placeholder="••••••••" required />
+                  <Select label="Votre rôle" value={rRole} onChange={setRRole} options={roleOptions} />
+                  <Btn type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
+                    <i className="ti ti-user-plus" /> Créer mon compte
+                  </Btn>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center' }}>
+                    Un email de confirmation sera envoyé à votre adresse.
+                  </p>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
 
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)', marginTop: 16 }}>
-          NextTalent v2.0 · Propulsé par LLaMA 3.1 & Claude IA
+          NextTalent v2.0 · Propulsé par LLaMA 3.1 & IA
         </p>
       </div>
     </div>
