@@ -40,9 +40,12 @@ export const api = {
   // Chat RAG
   chat: (question) => request('POST', '/chat-rag/', { question }),
 
+  // Email verification
+  resendVerification: (email) => request('POST', `/auth/resend-verification?email=${encodeURIComponent(email)}`),
+
   // ── Admin ────────────────────────────────────────────────────────────────
   adminLogin: (email, password, secret) =>
-    request('POST', `/admin/login?secret=${secret}`, { email, password, secret }),
+    request('POST', '/admin/login', { email, password, secret }),
 
   adminStats: () =>
     request('GET', `/admin/stats?secret=${ADMIN_SECRET}`),
