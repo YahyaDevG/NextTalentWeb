@@ -149,8 +149,9 @@ def login(creds: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
     if user.role != creds.role:
         raise HTTPException(status_code=401, detail="Rôle non correspondant")
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail="EMAIL_NOT_VERIFIED")
+    # Vérification email désactivée temporairement
+# if not user.is_verified:
+#     raise HTTPException(status_code=403, detail="EMAIL_NOT_VERIFIED")
     if user.is_blocked:
         raise HTTPException(status_code=403, detail="Compte bloqué. Contactez l'administrateur.")
     return {"user_id": user.id, "nom": user.nom, "email": user.email, "role": user.role}
