@@ -1,19 +1,44 @@
-import smtplib
 import os
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
 
-SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER", "yahyaerrah@gmail.com")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-FRONTEND_URL  = os.getenv("FRONTEND_URL", "https://nexttalent.ma")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FRONTEND_URL   = os.getenv("FRONTEND_URL", "https://nexttalent.ma")
+FROM_EMAIL     = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+
+
+def send_email(to_email: str, subject: str, html: str) -> bool:
+    """Envoie un email via l'API Resend (HTTP)."""
+    try:
+        response = httpx.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": f"NextTalent <{FROM_EMAIL}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html,
+            },
+            timeout=10,
+        )
+        if response.status_code == 200 or response.status_code == 201:
+            print(f"✅ Email envoyé à {to_email}")
+            return True
+        else:
+            print(f"❌ Erreur Resend : {response.status_code} — {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Erreur envoi email : {e}")
+        return False
 
 
 def send_verification_email(to_email: str, nom: str, token: str) -> bool:
+    """Envoie l'email de confirmation d'inscription."""
     verify_url = f"{FRONTEND_URL}/verify-email?token={token}"
 
     html = f"""
@@ -54,43 +79,22 @@ def send_verification_email(to_email: str, nom: str, token: str) -> bool:
           </div>
         </div>
         <div class="footer">
-          © 2026 NextTalent · nexttalent.ma · Email envoyé automatiquement, merci de ne pas répondre.
+          © 2026 NextTalent · nexttalent.ma · Email envoyé automatiquement.
         </div>
       </div>
     </body>
     </html>
     """
 
-    text = f"""
-    Bonjour {nom},
-    Merci de vous être inscrit sur NextTalent !
-    Cliquez sur ce lien pour confirmer votre email :
-    {verify_url}
-    Ce lien est valable 24 heures.
-    """
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "✅ Confirmez votre email — NextTalent"
-        msg["From"]    = f"NextTalent <{SMTP_USER}>"
-        msg["To"]      = to_email
-        msg.attach(MIMEText(text, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, to_email, msg.as_string())
-
-        print(f"✅ Email envoyé à {to_email}")
-        return True
-    except Exception as e:
-        print(f"❌ Erreur envoi email : {e}")
-        return False
+    return send_email(
+        to_email=to_email,
+        subject="✅ Confirmez votre email — NextTalent",
+        html=html,
+    )
 
 
 def send_welcome_email(to_email: str, nom: str) -> bool:
+    """Envoie un email de bienvenue après confirmation."""
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -117,10 +121,10 @@ def send_welcome_email(to_email: str, nom: str) -> bool:
         </div>
         <div class="body">
           <div class="title">🎉 Bienvenue sur NextTalent, {nom} !</div>
-          <p class="text">Votre compte a été activé avec succès. Vous pouvez maintenant accéder à toutes les fonctionnalités :</p>
-          <div class="feature"><span class="icon">🤖</span><div><strong>Analyse IA des CV</strong> — Import automatique et extraction intelligente des profils</div></div>
+          <p class="text">Votre compte a été activé avec succès. Accédez à toutes les fonctionnalités :</p>
+          <div class="feature"><span class="icon">🤖</span><div><strong>Analyse IA des CV</strong> — Extraction intelligente des profils</div></div>
           <div class="feature"><span class="icon">📊</span><div><strong>Classement hybride</strong> — Matching sémantique + compétences + expérience</div></div>
-          <div class="feature"><span class="icon">💬</span><div><strong>Assistant RAG</strong> — Interrogez votre base de candidats en langage naturel</div></div>
+          <div class="feature"><span class="icon">💬</span><div><strong>Assistant RAG</strong> — Interrogez votre base en langage naturel</div></div>
           <div style="text-align: center;">
             <a href="https://nexttalent.ma" class="btn">🚀 Accéder à NextTalent</a>
           </div>
@@ -131,21 +135,8 @@ def send_welcome_email(to_email: str, nom: str) -> bool:
     </html>
     """
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "🎉 Bienvenue sur NextTalent !"
-        msg["From"]    = f"NextTalent <{SMTP_USER}>"
-        msg["To"]      = to_email
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, to_email, msg.as_string())
-
-        print(f"✅ Email bienvenue envoyé à {to_email}")
-        return True
-    except Exception as e:
-        print(f"❌ Erreur envoi email bienvenue : {e}")
-        return False
+    return send_email(
+        to_email=to_email,
+        subject="🎉 Bienvenue sur NextTalent !",
+        html=html,
+    )
