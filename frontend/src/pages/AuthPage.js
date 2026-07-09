@@ -7,8 +7,6 @@ export default function AuthPage({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
   const [success, setSuccess] = useState('');
-  const [showResend, setShowResend] = useState(false);
-  const [resendEmail, setResendEmail] = useState('');
 
   // Login
   const [lEmail, setLEmail] = useState('');
@@ -38,18 +36,12 @@ export default function AuthPage({ onLogin }) {
 
   async function handleLogin(e) {
     e.preventDefault();
-    setError(''); setLoading(true); setShowResend(false);
+    setError(''); setLoading(true);
     try {
       const user = await api.login({ email: lEmail, password: lPass, role: lRole });
       onLogin(user);
     } catch (err) {
-      if (err.message === 'EMAIL_NOT_VERIFIED') {
-        setError('Votre email n\'est pas encore vérifié. Vérifiez votre boîte mail ou renvoyez le lien.');
-        setResendEmail(lEmail);
-        setShowResend(true);
-      } else {
-        setError(err.message);
-      }
+      setError(err.message);
     } finally { setLoading(false); }
   }
 
@@ -58,20 +50,8 @@ export default function AuthPage({ onLogin }) {
     setError(''); setLoading(true);
     try {
       await api.register({ nom: rNom, email: rEmail, password: rPass, role: rRole });
-      setSuccess('');
-      setTab('check-email');
-      setResendEmail(rEmail);
-    } catch (err) {
-      setError(err.message);
-    } finally { setLoading(false); }
-  }
-
-  async function handleResend() {
-    setLoading(true);
-    try {
-      await api.resendVerification(resendEmail);
-      setSuccess('Email renvoyé ! Vérifiez votre boîte mail.');
-      setShowResend(false);
+      const user = await api.login({ email: rEmail, password: rPass, role: rRole });
+      onLogin(user);
     } catch (err) {
       setError(err.message);
     } finally { setLoading(false); }
@@ -111,33 +91,11 @@ export default function AuthPage({ onLogin }) {
           <p style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Plateforme intelligente de recrutement IA</p>
         </div>
 
-        {/* ── Vérification email envoyée ── */}
-        {tab === 'check-email' ? (
-          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', padding: '36px 28px', textAlign: 'center' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>📧</div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Vérifiez votre email !</h2>
-            <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 20 }}>
-              Un email de confirmation a été envoyé à <strong>{resendEmail}</strong>.<br />
-              Cliquez sur le lien dans l'email pour activer votre compte.
-            </p>
-            <div style={{ background: 'var(--indigo-50)', borderRadius: 'var(--radius)', padding: '12px 16px', fontSize: 13, color: 'var(--indigo-dark)', marginBottom: 20 }}>
-              💡 Vérifiez aussi votre dossier <strong>Spam</strong> si vous ne trouvez pas l'email.
-            </div>
-            {success && <div style={{ marginBottom: 14 }}><Alert type="success">{success}</Alert></div>}
-            {error   && <div style={{ marginBottom: 14 }}><Alert type="danger">{error}</Alert></div>}
-            <Btn variant="secondary" onClick={handleResend} loading={loading} style={{ width: '100%', marginBottom: 12 }}>
-              <i className="ti ti-mail" /> Renvoyer l'email
-            </Btn>
-            <button onClick={() => { setTab('login'); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13 }}>
-              ← Retour à la connexion
-            </button>
-          </div>
-        ) : (
-          /* ── Login / Register ── */
-          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+        {/* ── Login / Register ── */}
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-              <button style={tabStyle(tab === 'login')}    onClick={() => { setTab('login');    setError(''); setSuccess(''); setShowResend(false); }}>Se connecter</button>
-              <button style={tabStyle(tab === 'register')} onClick={() => { setTab('register'); setError(''); setSuccess(''); setShowResend(false); }}>S'inscrire</button>
+              <button style={tabStyle(tab === 'login')}    onClick={() => { setTab('login');    setError(''); setSuccess(''); }}>Se connecter</button>
+              <button style={tabStyle(tab === 'register')} onClick={() => { setTab('register'); setError(''); setSuccess(''); }}>S'inscrire</button>
             </div>
 
             <div style={{ padding: '24px 28px' }}>
@@ -152,15 +110,6 @@ export default function AuthPage({ onLogin }) {
                   <Btn type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
                     <i className="ti ti-login" /> Se connecter
                   </Btn>
-                  {showResend && (
-                    <button type="button" onClick={handleResend} style={{
-                      background: 'var(--indigo-50)', border: '1px solid var(--indigo)',
-                      color: 'var(--indigo)', borderRadius: 'var(--radius)', padding: '9px',
-                      cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    }}>
-                      <i className="ti ti-mail" /> Renvoyer l'email de confirmation
-                    </button>
-                  )}
                 </form>
               ) : (
                 <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -171,14 +120,10 @@ export default function AuthPage({ onLogin }) {
                   <Btn type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
                     <i className="ti ti-user-plus" /> Créer mon compte
                   </Btn>
-                  <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center' }}>
-                    Un email de confirmation sera envoyé à votre adresse.
-                  </p>
                 </form>
               )}
             </div>
-          </div>
-        )}
+        </div>
 
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)', marginTop: 16 }}>
           NextTalent v2.0 · Propulsé par LLaMA 3.1 & IA
