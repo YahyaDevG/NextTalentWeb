@@ -81,17 +81,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email déjà utilisé")
     hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
-    token = secrets.token_urlsafe(32)
     new_user = UserModel(
         nom=user.nom, email=user.email, password_hash=hashed,
-        role=user.role, is_verified=False, verification_token=token
+        role=user.role, is_verified=True, verification_token=None
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    # Envoi email de vérification
-    send_verification_email(user.email, user.nom, token)
-    return {"message": "Compte créé. Vérifiez votre email pour activer votre compte.", "user_id": new_user.id}
+    return {"message": "Compte créé avec succès.", "user_id": new_user.id}
 
 @app.get("/auth/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
