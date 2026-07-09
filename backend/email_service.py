@@ -6,15 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SMTP_HOST     = os.getenv("SMTP_HOST", "mail.nexttalent.ma")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "465"))
-SMTP_USER     = os.getenv("SMTP_USER", "noreply@nexttalent.ma")
+SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER     = os.getenv("SMTP_USER", "yahyaerrah@gmail.com")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 FRONTEND_URL  = os.getenv("FRONTEND_URL", "https://nexttalent.ma")
 
 
 def send_verification_email(to_email: str, nom: str, token: str) -> bool:
-    """Envoie l'email de confirmation d'inscription."""
     verify_url = f"{FRONTEND_URL}/verify-email?token={token}"
 
     html = f"""
@@ -44,18 +43,18 @@ def send_verification_email(to_email: str, nom: str, token: str) -> bool:
         </div>
         <div class="body">
           <div class="title">Bonjour {nom} 👋</div>
-          <p class="text">Merci de vous être inscrit sur <strong>NextTalent</strong> ! Pour activer votre compte et commencer à utiliser la plateforme, veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous :</p>
+          <p class="text">Merci de vous être inscrit sur <strong>NextTalent</strong> ! Pour activer votre compte, veuillez confirmer votre adresse email :</p>
           <div style="text-align: center;">
             <a href="{verify_url}" class="btn">✅ Confirmer mon email</a>
           </div>
-          <p class="text">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :</p>
+          <p class="text">Si le bouton ne fonctionne pas, copiez ce lien :</p>
           <p class="link">{verify_url}</p>
           <div class="warning">
             ⏰ Ce lien est valable pendant <strong>24 heures</strong>. Si vous n'avez pas créé de compte sur NextTalent, ignorez cet email.
           </div>
         </div>
         <div class="footer">
-          © 2026 NextTalent · nexttalent.ma · Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+          © 2026 NextTalent · nexttalent.ma · Email envoyé automatiquement, merci de ne pas répondre.
         </div>
       </div>
     </body>
@@ -64,11 +63,9 @@ def send_verification_email(to_email: str, nom: str, token: str) -> bool:
 
     text = f"""
     Bonjour {nom},
-
     Merci de vous être inscrit sur NextTalent !
     Cliquez sur ce lien pour confirmer votre email :
     {verify_url}
-
     Ce lien est valable 24 heures.
     """
 
@@ -77,24 +74,23 @@ def send_verification_email(to_email: str, nom: str, token: str) -> bool:
         msg["Subject"] = "✅ Confirmez votre email — NextTalent"
         msg["From"]    = f"NextTalent <{SMTP_USER}>"
         msg["To"]      = to_email
-
         msg.attach(MIMEText(text, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
 
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, to_email, msg.as_string())
 
         print(f"✅ Email envoyé à {to_email}")
         return True
-
     except Exception as e:
         print(f"❌ Erreur envoi email : {e}")
         return False
 
 
 def send_welcome_email(to_email: str, nom: str) -> bool:
-    """Envoie un email de bienvenue après confirmation."""
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -121,7 +117,7 @@ def send_welcome_email(to_email: str, nom: str) -> bool:
         </div>
         <div class="body">
           <div class="title">🎉 Bienvenue sur NextTalent, {nom} !</div>
-          <p class="text">Votre compte a été activé avec succès. Vous pouvez maintenant accéder à toutes les fonctionnalités de la plateforme :</p>
+          <p class="text">Votre compte a été activé avec succès. Vous pouvez maintenant accéder à toutes les fonctionnalités :</p>
           <div class="feature"><span class="icon">🤖</span><div><strong>Analyse IA des CV</strong> — Import automatique et extraction intelligente des profils</div></div>
           <div class="feature"><span class="icon">📊</span><div><strong>Classement hybride</strong> — Matching sémantique + compétences + expérience</div></div>
           <div class="feature"><span class="icon">💬</span><div><strong>Assistant RAG</strong> — Interrogez votre base de candidats en langage naturel</div></div>
@@ -142,7 +138,9 @@ def send_welcome_email(to_email: str, nom: str) -> bool:
         msg["To"]      = to_email
         msg.attach(MIMEText(html, "html", "utf-8"))
 
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, to_email, msg.as_string())
 
