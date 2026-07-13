@@ -1,352 +1,370 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 export default function LandingPage({ onEnter }) {
   const [visible, setVisible] = useState(false);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 100);
   }, []);
 
-  const stats = [
-    { value: '98%', label: 'Précision IA' },
-    { value: '10x', label: 'Plus rapide' },
-    { value: '3',   label: 'Rôles distincts' },
-  ];
+  // ── Canvas Wave Animation ──────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+    let t = 0;
+
+    const resize = () => {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const waves = [
+      { amp: 60,  freq: 0.008, speed: 0.015, y: 0.72, color: 'rgba(79,70,229,0.22)',  blur: 0  },
+      { amp: 45,  freq: 0.010, speed: 0.020, y: 0.78, color: 'rgba(124,58,237,0.18)', blur: 0  },
+      { amp: 80,  freq: 0.006, speed: 0.010, y: 0.68, color: 'rgba(99,102,241,0.12)', blur: 0  },
+      { amp: 35,  freq: 0.012, speed: 0.025, y: 0.82, color: 'rgba(16,185,129,0.14)', blur: 0  },
+      { amp: 100, freq: 0.005, speed: 0.007, y: 0.62, color: 'rgba(79,70,229,0.07)',  blur: 0  },
+      { amp: 55,  freq: 0.009, speed: 0.018, y: 0.12, color: 'rgba(124,58,237,0.10)', blur: 0  },
+      { amp: 40,  freq: 0.011, speed: 0.022, y: 0.06, color: 'rgba(79,70,229,0.08)',  blur: 0  },
+    ];
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      t += 1;
+
+      waves.forEach(w => {
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height * w.y);
+
+        for (let x = 0; x <= canvas.width; x += 2) {
+          const y = canvas.height * w.y
+            + Math.sin(x * w.freq + t * w.speed) * w.amp
+            + Math.sin(x * w.freq * 1.7 + t * w.speed * 0.8) * (w.amp * 0.4)
+            + Math.sin(x * w.freq * 0.5 + t * w.speed * 1.3) * (w.amp * 0.25);
+          ctx.lineTo(x, y);
+        }
+
+        // Fill to bottom or top depending on wave position
+        if (w.y > 0.5) {
+          ctx.lineTo(canvas.width, canvas.height);
+          ctx.lineTo(0, canvas.height);
+        } else {
+          ctx.lineTo(canvas.width, 0);
+          ctx.lineTo(0, 0);
+        }
+        ctx.closePath();
+
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        gradient.addColorStop(0,    w.color);
+        gradient.addColorStop(0.5,  w.color.replace('0.', '0.').replace(/[\d.]+\)$/, m => String(Math.min(parseFloat(m)*1.6, 1)) + ')'));
+        gradient.addColorStop(1,    w.color);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      });
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
 
   const features = [
-    { icon: '🤖', title: 'Analyse IA des CV',    desc: 'Extraction automatique des compétences, expériences et profils via LLaMA 3.1' },
-    { icon: '📊', title: 'Matching Hybride',      desc: 'Scoring sémantique + compétences + expérience pour un classement objectif' },
-    { icon: '💬', title: 'Assistant RAG',         desc: 'Interrogez votre base de candidats en langage naturel, comme avec un expert RH' },
-    { icon: '🛡️', title: 'Multi-rôles sécurisé', desc: 'Espaces dédiés pour recruteurs, candidats et administrateurs' },
+    { icon: '🤖', title: 'Analyse IA des CV',    desc: 'Extraction automatique via LLaMA 3.1 — NER, compétences, expériences en quelques secondes.' },
+    { icon: '📊', title: 'Matching Hybride',      desc: 'Score sémantique (40%) + compétences (40%) + expérience (20%) pour un classement objectif.' },
+    { icon: '💬', title: 'Assistant RAG',         desc: 'Interrogez votre base de candidats en langage naturel comme avec un expert RH.' },
+    { icon: '🛡️', title: 'Sécurité Multi-rôles', desc: 'Espaces dédiés et sécurisés pour recruteurs, candidats et administrateurs.' },
+  ];
+
+  const stats = [
+    { value: '98%', label: 'Précision NER' },
+    { value: '10x', label: 'Plus rapide' },
+    { value: '∞',   label: 'CV analysés' },
+    { value: '3',   label: 'Espaces dédiés' },
   ];
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#050510',
+      background: 'radial-gradient(ellipse at 20% 50%, #0D0B2B 0%, #060614 60%, #000 100%)',
       color: '#fff',
-      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+      fontFamily: "'Inter', sans-serif",
       overflowX: 'hidden',
+      position: 'relative',
     }}>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
-        /* ── Waves ── */
-        .wave-container {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
-        }
-        .wave {
-          position: absolute; bottom: 0; left: 0; width: 200%; height: 100%;
-          opacity: .18;
-        }
-        .wave1 { animation: wave-move1 12s linear infinite; }
-        .wave2 { animation: wave-move2 16s linear infinite; opacity: .12; }
-        .wave3 { animation: wave-move3 20s linear infinite; opacity: .08; }
-        .wave4 { animation: wave-move4 9s  linear infinite; opacity: .14; }
+        @keyframes fadeUp   { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:none} }
+        @keyframes fadeIn   { from{opacity:0} to{opacity:1} }
+        @keyframes pulse    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.95)} }
+        @keyframes rotate   { to{transform:rotate(360deg)} }
+        @keyframes glow     { 0%,100%{opacity:.6} 50%{opacity:1} }
+        @keyframes slide-x  { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+        @keyframes float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
 
-        @keyframes wave-move1 { 0%{transform:translateX(0)}   100%{transform:translateX(-50%)} }
-        @keyframes wave-move2 { 0%{transform:translateX(-50%)} 100%{transform:translateX(0)} }
-        @keyframes wave-move3 { 0%{transform:translateX(0)}   100%{transform:translateX(-50%)} }
-        @keyframes wave-move4 { 0%{transform:translateX(-50%)} 100%{transform:translateX(0)} }
-
-        /* ── Particles ── */
-        .particle {
-          position: absolute; border-radius: 50%;
-          background: radial-gradient(circle, rgba(79,70,229,.8), transparent);
-          animation: particle-float linear infinite;
-        }
-        @keyframes particle-float {
-          0%   { transform: translateY(100vh) scale(0); opacity: 0; }
-          10%  { opacity: 1; }
-          90%  { opacity: .5; }
-          100% { transform: translateY(-100px) scale(1); opacity: 0; }
-        }
-
-        /* ── Grid overlay ── */
-        .grid-overlay {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image:
-            linear-gradient(rgba(79,70,229,.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(79,70,229,.04) 1px, transparent 1px);
-          background-size: 60px 60px;
-        }
-
-        /* ── Glow orbs ── */
-        .orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
-        .orb1 {
-          width: 700px; height: 700px; top: -15%; left: -15%;
-          background: radial-gradient(circle, rgba(79,70,229,.25) 0%, transparent 70%);
-          animation: orb-move1 15s ease-in-out infinite;
-        }
-        .orb2 {
-          width: 500px; height: 500px; bottom: -10%; right: -10%;
-          background: radial-gradient(circle, rgba(124,58,237,.2) 0%, transparent 70%);
-          animation: orb-move2 18s ease-in-out infinite;
-        }
-        .orb3 {
-          width: 350px; height: 350px; top: 40%; left: 40%;
-          background: radial-gradient(circle, rgba(16,185,129,.12) 0%, transparent 70%);
-          animation: orb-move3 22s ease-in-out infinite;
-        }
-        @keyframes orb-move1 { 0%,100%{transform:translate(0,0)}  50%{transform:translate(60px,80px)} }
-        @keyframes orb-move2 { 0%,100%{transform:translate(0,0)}  50%{transform:translate(-80px,-60px)} }
-        @keyframes orb-move3 { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.4)} }
-
-        /* ── Animations ── */
-        @keyframes fadeUp  { from{opacity:0;transform:translateY(32px)} to{opacity:1;transform:none} }
-        @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.5} }
-        @keyframes shimmer {
-          0%   { background-position: -200% center }
-          100% { background-position:  200% center }
-        }
-
-        /* ── Buttons ── */
-        .btn-primary {
-          background: linear-gradient(135deg, #4F46E5, #7C3AED);
+        .btn-cta {
+          position: relative; overflow: hidden;
+          background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #4F46E5 100%);
+          background-size: 200% 100%;
           color: #fff; border: none; border-radius: 14px;
-          padding: 16px 40px; font-size: 16px; font-weight: 700;
-          cursor: pointer; transition: all .3s cubic-bezier(.34,1.56,.64,1);
-          box-shadow: 0 8px 32px rgba(79,70,229,.4);
-          display: flex; align-items: center; gap: 10;
+          padding: 17px 44px; font-size: 16px; font-weight: 700;
+          cursor: pointer; transition: all .35s ease;
+          box-shadow: 0 0 0 0 rgba(79,70,229,.5);
         }
-        .btn-primary:hover {
-          transform: translateY(-4px) scale(1.04);
-          box-shadow: 0 20px 60px rgba(79,70,229,.55);
+        .btn-cta::before {
+          content: '';
+          position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
+          animation: slide-x 2.5s infinite;
         }
-        .btn-secondary {
-          background: rgba(255,255,255,.06);
-          color: #fff; border: 1px solid rgba(255,255,255,.15);
-          border-radius: 14px; padding: 16px 32px;
+        .btn-cta:hover {
+          transform: translateY(-4px) scale(1.03);
+          box-shadow: 0 0 40px 8px rgba(79,70,229,.45);
+          background-position: right center;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: rgba(255,255,255,.8); 
+          border: 1px solid rgba(255,255,255,.2);
+          border-radius: 14px; padding: 17px 36px;
           font-size: 16px; font-weight: 500; cursor: pointer;
-          transition: all .25s ease;
-          display: flex; align-items: center; gap: 8;
+          transition: all .25s ease; backdrop-filter: blur(8px);
         }
-        .btn-secondary:hover {
-          background: rgba(255,255,255,.12);
-          border-color: rgba(255,255,255,.3);
-          transform: translateY(-2px);
+        .btn-outline:hover {
+          border-color: rgba(79,70,229,.6);
+          background: rgba(79,70,229,.12);
+          transform: translateY(-3px);
+          color: #fff;
         }
-        .btn-nav {
-          background: linear-gradient(135deg, #4F46E5, #7C3AED);
-          color: #fff; border: none; border-radius: 9px;
-          padding: 9px 22px; font-size: 13px; font-weight: 600;
-          cursor: pointer; transition: all .25s ease;
-          box-shadow: 0 4px 16px rgba(79,70,229,.35);
-        }
-        .btn-nav:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(79,70,229,.5); }
 
-        /* ── Feature cards ── */
         .feature-card {
-          background: rgba(255,255,255,.03);
+          background: linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
           border: 1px solid rgba(255,255,255,.07);
-          border-radius: 18px; padding: 28px 24px;
-          transition: all .3s ease; cursor: default;
+          border-radius: 20px; padding: 32px 26px;
+          transition: all .35s cubic-bezier(.34,1.2,.64,1);
+          cursor: default; position: relative; overflow: hidden;
         }
-        .feature-card:hover {
-          transform: translateY(-8px);
-          border-color: rgba(79,70,229,.4);
-          background: rgba(79,70,229,.07);
-          box-shadow: 0 20px 40px rgba(79,70,229,.15);
+        .feature-card::before {
+          content: '';
+          position: absolute; inset: 0; border-radius: 20px;
+          background: linear-gradient(135deg, rgba(79,70,229,.15), transparent);
+          opacity: 0; transition: opacity .35s;
         }
+        .feature-card:hover { transform: translateY(-10px) scale(1.02); border-color: rgba(79,70,229,.35); }
+        .feature-card:hover::before { opacity: 1; }
 
-        .stat-item { transition: transform .2s ease; text-align: center; }
-        .stat-item:hover { transform: scale(1.08); }
+        .nav-link {
+          color: rgba(255,255,255,.5); font-size: 13px; font-weight: 500;
+          text-decoration: none; transition: color .2s; cursor: pointer; letter-spacing: .03em;
+        }
+        .nav-link:hover { color: #fff; }
+
+        .stat-card {
+          background: rgba(255,255,255,.04);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 16px; padding: 24px 28px;
+          text-align: center; transition: all .25s ease;
+        }
+        .stat-card:hover {
+          background: rgba(79,70,229,.1);
+          border-color: rgba(79,70,229,.3);
+          transform: translateY(-4px);
+        }
       `}</style>
 
-      {/* ══════ BACKGROUND ══════ */}
+      {/* ── Canvas waves background ── */}
+      <canvas ref={canvasRef} style={{
+        position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+      }} />
 
-      {/* Grid */}
-      <div className="grid-overlay" />
-
-      {/* Glow orbs */}
+      {/* ── Star field ── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        <div className="orb orb1" />
-        <div className="orb orb2" />
-        <div className="orb orb3" />
+        {[...Array(60)].map((_, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width:  `${Math.random() * 2 + 1}px`,
+            height: `${Math.random() * 2 + 1}px`,
+            borderRadius: '50%',
+            background: '#fff',
+            left:    `${Math.random() * 100}%`,
+            top:     `${Math.random() * 100}%`,
+            opacity: Math.random() * 0.6 + 0.1,
+            animation: `glow ${2 + Math.random() * 4}s ease-in-out infinite`,
+            animationDelay: `${Math.random() * 4}s`,
+          }} />
+        ))}
       </div>
 
-      {/* Animated waves */}
-      <div className="wave-container">
-        {/* Wave 1 — indigo */}
-        <svg className="wave wave1" viewBox="0 0 1440 320" preserveAspectRatio="none"
-          style={{ position: 'absolute', bottom: 0, height: '40%' }}>
-          <path fill="url(#grad1)" d="
-            M0,160 C180,220 360,80 540,160 C720,240 900,80 1080,160
-            C1260,240 1380,120 1440,160 L1440,320 L0,320 Z
-            M1440,160 C1620,220 1800,80 1980,160 C2160,240 2340,80 2520,160
-            C2700,240 2820,120 2880,160 L2880,320 L1440,320 Z
-          "/>
-          <defs>
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stopColor="#4F46E5" />
-              <stop offset="50%"  stopColor="#7C3AED" />
-              <stop offset="100%" stopColor="#4F46E5" />
-            </linearGradient>
-          </defs>
-        </svg>
-
-        {/* Wave 2 — violet */}
-        <svg className="wave wave2" viewBox="0 0 1440 320" preserveAspectRatio="none"
-          style={{ position: 'absolute', bottom: 0, height: '35%' }}>
-          <path fill="url(#grad2)" d="
-            M0,200 C240,120 480,260 720,180 C960,100 1200,240 1440,200
-            L1440,320 L0,320 Z
-            M1440,200 C1680,120 1920,260 2160,180 C2400,100 2640,240 2880,200
-            L2880,320 L1440,320 Z
-          "/>
-          <defs>
-            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stopColor="#7C3AED" />
-              <stop offset="50%"  stopColor="#4F46E5" />
-              <stop offset="100%" stopColor="#7C3AED" />
-            </linearGradient>
-          </defs>
-        </svg>
-
-        {/* Wave 3 — cyan/green accent */}
-        <svg className="wave wave3" viewBox="0 0 1440 320" preserveAspectRatio="none"
-          style={{ position: 'absolute', bottom: 0, height: '28%' }}>
-          <path fill="url(#grad3)" d="
-            M0,240 C360,160 720,300 1080,220 C1260,180 1380,260 1440,240
-            L1440,320 L0,320 Z
-            M1440,240 C1800,160 2160,300 2520,220 C2700,180 2820,260 2880,240
-            L2880,320 L1440,320 Z
-          "/>
-          <defs>
-            <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stopColor="#10B981" />
-              <stop offset="50%"  stopColor="#4F46E5" />
-              <stop offset="100%" stopColor="#10B981" />
-            </linearGradient>
-          </defs>
-        </svg>
-
-        {/* Wave 4 — top waves */}
-        <svg className="wave wave4" viewBox="0 0 1440 200" preserveAspectRatio="none"
-          style={{ position: 'absolute', top: 0, height: '25%', transform: 'rotate(180deg)' }}>
-          <path fill="url(#grad4)" d="
-            M0,100 C360,40 720,160 1080,80 C1260,40 1380,120 1440,100
-            L1440,200 L0,200 Z
-            M1440,100 C1800,40 2160,160 2520,80 C2700,40 2820,120 2880,100
-            L2880,200 L1440,200 Z
-          "/>
-          <defs>
-            <linearGradient id="grad4" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stopColor="#4F46E5" stopOpacity="0.5"/>
-              <stop offset="50%"  stopColor="#7C3AED" stopOpacity="0.3"/>
-              <stop offset="100%" stopColor="#4F46E5" stopOpacity="0.5"/>
-            </linearGradient>
-          </defs>
-        </svg>
+      {/* ── Glow orbs ── */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+        {[
+          { size: 650, top: '-8%',  left: '-8%',  color: 'rgba(79,70,229,.2)',  anim: 'float 14s ease-in-out infinite' },
+          { size: 500, bottom: '-5%', right: '-5%', color: 'rgba(124,58,237,.16)', anim: 'float 18s ease-in-out infinite reverse' },
+          { size: 280, top: '45%',  left: '45%',  color: 'rgba(16,185,129,.1)',  anim: 'float 10s ease-in-out infinite' },
+        ].map((o, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width: o.size, height: o.size, borderRadius: '50%',
+            background: `radial-gradient(circle, ${o.color} 0%, transparent 70%)`,
+            filter: 'blur(60px)',
+            top: o.top, left: o.left, bottom: o.bottom, right: o.right,
+            animation: o.anim,
+          }} />
+        ))}
       </div>
 
-      {/* Floating particles */}
-      {[...Array(12)].map((_, i) => (
-        <div key={i} className="particle" style={{
-          width:  `${4 + Math.random() * 8}px`,
-          height: `${4 + Math.random() * 8}px`,
-          left:   `${Math.random() * 100}%`,
-          animationDuration: `${8 + Math.random() * 12}s`,
-          animationDelay:    `${Math.random() * 10}s`,
-        }} />
-      ))}
-
-      {/* ══════ NAVBAR ══════ */}
+      {/* ── Navbar ── */}
       <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 40px',
-        background: 'rgba(5,5,16,.75)',
-        backdropFilter: 'blur(24px)',
-        borderBottom: '1px solid rgba(79,70,229,.12)',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity .8s ease',
+        padding: '0 48px', height: 64,
+        background: 'rgba(6,6,20,.7)',
+        backdropFilter: 'blur(28px) saturate(180%)',
+        borderBottom: '1px solid rgba(255,255,255,.06)',
+        opacity: visible ? 1 : 0, transition: 'opacity .8s ease',
       }}>
+        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10,
+            width: 34, height: 34, borderRadius: 9,
             background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, boxShadow: '0 4px 16px rgba(79,70,229,.4)',
+            fontSize: 16, boxShadow: '0 0 20px rgba(79,70,229,.5)',
+            animation: 'glow 3s ease-in-out infinite',
           }}>💼</div>
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 800, fontSize: 20, letterSpacing: '-.02em' }}>
-            Next<span style={{ color: '#818CF8' }}>Talent</span>
+          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 800, fontSize: 19, letterSpacing: '-.02em' }}>
+            Next<span style={{ background: 'linear-gradient(135deg,#818CF8,#A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Talent</span>
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', letterSpacing: '.06em' }}>nexttalent.ma</span>
-          <button className="btn-nav" onClick={onEnter}>Se connecter →</button>
+
+        {/* Nav links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          <span className="nav-link">Fonctionnalités</span>
+          <span className="nav-link">Recruteurs</span>
+          <span className="nav-link">Candidats</span>
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,.1)' }} />
+          <button className="btn-cta" onClick={onEnter} style={{ padding: '9px 22px', fontSize: 13, borderRadius: 9 }}>
+            Accéder →
+          </button>
         </div>
       </nav>
 
-      {/* ══════ HERO ══════ */}
+      {/* ── Hero ── */}
       <div style={{
         position: 'relative', zIndex: 1,
         minHeight: '100vh',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        padding: '120px 24px 80px', textAlign: 'center',
+        padding: '100px 24px 60px', textAlign: 'center',
       }}>
 
-        {/* Live badge */}
+        {/* Rotating ring */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 500, height: 500, borderRadius: '50%',
+          border: '1px solid rgba(79,70,229,.12)',
+          animation: 'rotate 30s linear infinite',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            position: 'absolute', top: -4, left: '50%',
+            width: 8, height: 8, borderRadius: '50%',
+            background: '#4F46E5', transform: 'translateX(-50%)',
+            boxShadow: '0 0 12px 4px rgba(79,70,229,.8)',
+          }} />
+        </div>
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 700, height: 700, borderRadius: '50%',
+          border: '1px solid rgba(124,58,237,.08)',
+          animation: 'rotate 50s linear infinite reverse',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            position: 'absolute', bottom: -4, left: '50%',
+            width: 6, height: 6, borderRadius: '50%',
+            background: '#7C3AED', transform: 'translateX(-50%)',
+            boxShadow: '0 0 10px 3px rgba(124,58,237,.8)',
+          }} />
+        </div>
+
+        {/* Badge */}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: 'rgba(79,70,229,.15)', border: '1px solid rgba(79,70,229,.3)',
-          borderRadius: 99, padding: '7px 18px', marginBottom: 32,
-          fontSize: 11, color: '#A5B4FC', fontWeight: 700, letterSpacing: '.08em',
+          background: 'rgba(79,70,229,.12)',
+          border: '1px solid rgba(79,70,229,.25)',
+          borderRadius: 99, padding: '7px 18px', marginBottom: 36,
+          fontSize: 11, color: '#A5B4FC', fontWeight: 700, letterSpacing: '.1em',
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .6s .1s ease both' : 'none',
         }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
-          PLATEFORME IA · RECRUTEMENT INTELLIGENT · MAROC
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+          IA · RECRUTEMENT · MAROC · 2026
         </div>
 
-        {/* Title */}
+        {/* Main heading */}
         <h1 style={{
           fontFamily: "'Space Grotesk', sans-serif",
-          fontSize: 'clamp(56px, 10vw, 100px)',
+          fontSize: 'clamp(52px, 9vw, 96px)',
           fontWeight: 800, lineHeight: 1.02,
-          letterSpacing: '-.04em', marginBottom: 8,
+          letterSpacing: '-.045em', marginBottom: 6,
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .7s .2s ease both' : 'none',
         }}>
+          <span style={{ color: '#fff' }}>Next</span>
           <span style={{
-            background: 'linear-gradient(135deg, #fff 20%, #C7D2FE 80%)',
+            background: 'linear-gradient(135deg, #6366F1, #8B5CF6, #A78BFA)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>Next</span>
-          <span style={{
-            background: 'linear-gradient(135deg, #4F46E5, #7C3AED, #A78BFA)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            display: 'inline-block',
+            filter: 'drop-shadow(0 0 30px rgba(99,102,241,.5))',
           }}>Talent</span>
         </h1>
 
-        {/* Domain */}
+        {/* Domain badge */}
         <div style={{
-          fontSize: 13, color: 'rgba(255,255,255,.25)', marginBottom: 24,
-          letterSpacing: '.12em', fontWeight: 500,
+          display: 'inline-block',
+          background: 'rgba(99,102,241,.12)',
+          border: '1px solid rgba(99,102,241,.2)',
+          borderRadius: 6, padding: '3px 12px', marginBottom: 28,
+          fontSize: 12, color: 'rgba(255,255,255,.4)', letterSpacing: '.12em',
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .7s .3s ease both' : 'none',
-        }}>nexttalent.ma</div>
+        }}>
+          nexttalent.ma
+        </div>
 
         {/* Tagline */}
         <p style={{
-          fontSize: 'clamp(20px, 3vw, 28px)',
-          fontWeight: 300, color: 'rgba(255,255,255,.8)',
-          maxWidth: 680, lineHeight: 1.45, marginBottom: 14,
+          fontSize: 'clamp(20px, 3.5vw, 30px)',
+          fontWeight: 300, color: 'rgba(255,255,255,.85)',
+          maxWidth: 700, lineHeight: 1.4, marginBottom: 14,
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .7s .4s ease both' : 'none',
         }}>
-          Le leader du recrutement intelligent au Maroc
+          Le recrutement intelligent,{' '}
+          <span style={{ color: '#818CF8', fontWeight: 600 }}>propulsé par l'IA</span>
         </p>
 
         <p style={{
-          fontSize: 15, color: 'rgba(255,255,255,.38)',
-          maxWidth: 520, lineHeight: 1.75, marginBottom: 52,
+          fontSize: 15, color: 'rgba(255,255,255,.35)',
+          maxWidth: 500, lineHeight: 1.8, marginBottom: 52,
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .7s .5s ease both' : 'none',
         }}>
-          Analysez des CV en quelques secondes, classez vos candidats par pertinence et trouvez les meilleurs profils grâce à l'Intelligence Artificielle.
+          Analysez, classez et sélectionnez les meilleurs profils en quelques secondes grâce à l'Intelligence Artificielle générative.
         </p>
 
         {/* CTAs */}
@@ -355,115 +373,98 @@ export default function LandingPage({ onEnter }) {
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .7s .6s ease both' : 'none',
         }}>
-          <button className="btn-primary" onClick={onEnter}>
+          <button className="btn-cta" onClick={onEnter}>
             🚀 Accéder à la plateforme
           </button>
-          <button className="btn-secondary" onClick={onEnter}>
-            👤 Créer un compte
+          <button className="btn-outline" onClick={onEnter}>
+            Créer un compte gratuit →
           </button>
         </div>
 
-        {/* Stats */}
+        {/* Stats grid */}
         <div style={{
-          display: 'flex', gap: 60, marginTop: 80, flexWrap: 'wrap', justifyContent: 'center',
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 14, marginTop: 80, maxWidth: 720, width: '100%',
           opacity: visible ? 1 : 0,
           animation: visible ? 'fadeUp .7s .8s ease both' : 'none',
         }}>
           {stats.map(s => (
-            <div key={s.label} className="stat-item">
+            <div key={s.label} className="stat-card">
               <div style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: 40, fontWeight: 800, lineHeight: 1,
-                background: 'linear-gradient(135deg, #fff 30%, #818CF8)',
+                fontSize: 32, fontWeight: 800,
+                background: 'linear-gradient(135deg, #fff, #818CF8)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                marginBottom: 4,
               }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 7, letterSpacing: '.08em', textTransform: 'uppercase' }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', letterSpacing: '.06em', textTransform: 'uppercase' }}>{s.label}</div>
             </div>
           ))}
-        </div>
-
-        {/* Scroll indicator */}
-        <div style={{
-          position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-          opacity: .4, animation: 'pulse 2s infinite',
-        }}>
-          <span style={{ fontSize: 11, color: '#fff', letterSpacing: '.08em' }}>DÉFILER</span>
-          <div style={{ width: 1, height: 32, background: 'linear-gradient(to bottom, #fff, transparent)' }} />
         </div>
       </div>
 
-      {/* ══════ FEATURES ══════ */}
-      <div style={{
-        position: 'relative', zIndex: 1,
-        padding: '80px 24px 60px',
-        maxWidth: 1100, margin: '0 auto',
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+      {/* ── Features ── */}
+      <div style={{ position: 'relative', zIndex: 1, padding: '60px 24px 100px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <h2 style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 700,
-            background: 'linear-gradient(135deg, #fff, #A5B4FC)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            marginBottom: 12,
+            fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 700, color: '#fff', marginBottom: 10,
           }}>
-            Tout ce dont vous avez besoin
+            Une plateforme, toutes les fonctionnalités
           </h2>
-          <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 16 }}>
-            Une plateforme complète pour révolutionner votre processus de recrutement
+          <p style={{ color: 'rgba(255,255,255,.3)', fontSize: 15 }}>
+            De l'import du CV jusqu'au choix final du candidat
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18 }}>
           {features.map((f, i) => (
             <div key={i} className="feature-card">
-              <div style={{ fontSize: 38, marginBottom: 16 }}>{f.icon}</div>
+              <div style={{ fontSize: 36, marginBottom: 14, animation: `float ${4 + i}s ease-in-out infinite`, display: 'inline-block' }}>{f.icon}</div>
               <div style={{ fontWeight: 700, fontSize: 16, color: '#fff', marginBottom: 8 }}>{f.title}</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,.4)', lineHeight: 1.65 }}>{f.desc}</div>
+              <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,.38)', lineHeight: 1.7 }}>{f.desc}</div>
             </div>
           ))}
         </div>
 
-        {/* Final CTA */}
+        {/* CTA banner */}
         <div style={{
-          marginTop: 80, textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(79,70,229,.12), rgba(124,58,237,.12))',
-          border: '1px solid rgba(79,70,229,.22)',
-          borderRadius: 24, padding: '56px 32px',
+          marginTop: 72, textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(79,70,229,.1) 0%, rgba(124,58,237,.1) 100%)',
+          border: '1px solid rgba(79,70,229,.2)',
+          borderRadius: 24, padding: '52px 32px',
           position: 'relative', overflow: 'hidden',
         }}>
           <div style={{
-            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-            width: 400, height: 400, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(79,70,229,.15) 0%, transparent 70%)',
+            position: 'absolute', inset: 0, borderRadius: 24,
+            background: 'radial-gradient(ellipse at center, rgba(79,70,229,.12) 0%, transparent 70%)',
             pointerEvents: 'none',
           }} />
-          <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, marginBottom: 12, position: 'relative', zIndex: 1 }}>
-            Prêt à transformer votre recrutement ?
+          <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700, marginBottom: 10, position: 'relative' }}>
+            Transformez votre recrutement dès aujourd'hui
           </h3>
-          <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 15, marginBottom: 32, position: 'relative', zIndex: 1 }}>
-            Rejoignez NextTalent et recrutez plus intelligemment dès aujourd'hui.
+          <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14, marginBottom: 28, position: 'relative' }}>
+            Gratuit · Sans carte bancaire · Déploiement instantané
           </p>
-          <button className="btn-primary" onClick={onEnter} style={{ margin: '0 auto', position: 'relative', zIndex: 1 }}>
-            🚀 Commencer maintenant — C'est gratuit
+          <button className="btn-cta" onClick={onEnter} style={{ position: 'relative', margin: '0 auto' }}>
+            🚀 Commencer maintenant
           </button>
         </div>
       </div>
 
-      {/* ══════ FOOTER ══════ */}
+      {/* ── Footer ── */}
       <div style={{
         position: 'relative', zIndex: 1,
         borderTop: '1px solid rgba(255,255,255,.05)',
-        padding: '24px 40px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 12,
+        padding: '20px 48px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
       }}>
-        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14 }}>
+        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14, color: '#fff' }}>
           Next<span style={{ color: '#818CF8' }}>Talent</span>
-          <span style={{ color: 'rgba(255,255,255,.2)', fontWeight: 400, fontSize: 12, marginLeft: 10 }}>© 2026 · nexttalent.ma</span>
+          <span style={{ color: 'rgba(255,255,255,.2)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>© 2026 · nexttalent.ma</span>
         </span>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.18)' }}>
-          Propulsé par LLaMA 3.1 · SentenceTransformers · FastAPI · React.js
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.15)' }}>
+          LLaMA 3.1 · SentenceTransformers · FastAPI · React.js · Railway · Vercel
         </span>
       </div>
 
